@@ -221,7 +221,7 @@ const Scene = {
         if (hash2(n + j * 5, Math.floor(t * 8)) > 0.35 + t * 0.25) put(wx + n, Math.round(wy - 2 - hgt + j), [235, 245, 250]);
     }
     // Kevin the honu: in the shallows, or (where the place has a beach) crawling up the sand to bask.
-    if (this.kevin.t >= 0) {
+    if (this.kevin.t >= 0 && L.kevin) {                       // (no L.kevin: he isn't at this place)
       const k = this.kevin.t, up = clamp(Math.min(k, 7 - k), 0, 1);
       const path = this.kevinMode === "ashore" && L.kevinBeach, a = path ? this.kevin.a : 0;
       let kx = L.kevin[0], ky0 = L.kevin[1];

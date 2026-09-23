@@ -602,4 +602,112 @@ const PLACES = {
       },
     },
   },
+
+  8: {
+    id: "manoa",
+    name: "Mānoa Falls",
+    when: "late morning",
+    clock: "11:00 a.m.",
+    music: "music/breezy_hawaiian_groove.mp3",
+    plates: ["mist", "haze", "midday"].map(n => `plates/manoa_${n}.png`),
+    nosun: "plates/manoa_nosun.png",
+    granola: 18,
+    kevinAfter: "hidden",                   // no sea turtles in a rainforest: Kevin phones Tavita from the ocean
+    act: {
+      sign: ["🪧", "Trail sign"], card: ["✉️", "Postcard"], pool: ["🪨", "Stepping stones"],
+      kevin: ["🐢", "Kevin"], shells: ["🌿", "Ferns"], sun: ["💦", "Waterfall"],
+    },
+    signLabel: "trail-sign",
+    shellsTitle: "Ferns along the trail",
+    reflectTitle: "Waterfall reflection",
+    reflectIcon: "💦",
+    photoAlt: "Mānoa Falls in the rainforest, with a little rainbow in the spray",
+    scene: {
+      horizon: 0,
+      isWater: (r, g, b) => b > r + 40 && g > r + 40,                  // the turquoise pool and stream
+      isGlint: (r, g, b) => (r + g + b) / 3 > 225 && b >= r,           // white water and spray
+      shimmer: [0.02, 0.05, 0.9],
+      glintWithSun: true,
+      sunFade: [0.6, 1],                    // (no painted sun: the light comes through the canopy)
+      risingSun: null,
+      stars: false,
+      sparkle: [152, 104],                  // in the spray at the foot of the falls
+      spray: [[146, 113], [152, 114], [158, 113]],
+      whale: null,
+      kevin: null,
+      ledge: 168,                           // the sprites stand on the flat dirt at the end of the trail
+      player: 4, tavita: 18,
+      shade: [[150, 158, 156], [200, 206, 202], [255, 255, 255]],   // mist → haze → sun through the leaves
+      birds: [[40, 46, 42], [36, 40, 36], [30, 32, 28]],
+      // Signature animation: the falls flow, mist drifts through the valley and thins, drips fall from the
+      // canopy, sunbeams slant down through the leaves, and a little rainbow stands in the spray at the end.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024, K = 3.2;
+        const mix = (x, y, c, a) => {       // blend screen pixel (x, y) of the plate toward colour c
+          x |= 0; y |= 0; if (x < 0 || x >= W || y < 0 || y >= 576 || a <= 0) return;
+          const o = (y * W + x) * 4, f = Math.min(1, a);
+          h.px(x, y, [base[o] + (c[0] - base[o]) * f, base[o + 1] + (c[1] - base[o + 1]) * f, base[o + 2] + (c[2] - base[o + 2]) * f]);
+        };
+        const blk = (x, y, c, a) => { mix(x, y, c, a); mix(x + 1, y, c, a); mix(x, y + 1, c, a); mix(x + 1, y + 1, c, a); };
+
+        // 1. The falls: bright ribbons of water scroll downward, faster near the bottom.
+        for (let y = 0; y < 372; y += 2) for (let x = 448; x < 526; x += 2) {
+          const o = (y * W + x) * 4;
+          if (base[o] + base[o + 1] + base[o + 2] < 3 * 175) continue;
+          const col = x >> 2, n = hash2(col, Math.floor((y + hash2(col, 1) * 300 - time * (110 + y * 0.25)) / 9));
+          if (n > 0.72) blk(x, y, [255, 255, 255], 0.55);
+          else if (n < 0.18) blk(x, y, [150, 196, 204], 0.3);
+        }
+
+        // 2. Sunbeams slanting down through gaps in the canopy, from about halfway through the week.
+        const sun = Math.max(0, Math.min(1, (T - 0.35) / 0.5));
+        if (sun > 0) {
+          const BEAMS = [[40, 46], [170, 30], [320, 40], [640, 34], [780, 28]];
+          BEAMS.forEach(([x0, w], i) => {
+            const a0 = sun * (0.24 + 0.07 * Math.sin(time * 0.4 + i * 1.7));
+            for (let y = 0; y < 520; y += 2) {
+              const cx = x0 + y * 0.42, fade = a0 * (1 - y / 560);
+              for (let x = Math.floor(cx - w / 2) & ~1; x < cx + w / 2; x += 2) {
+                const e = 1 - Math.abs(x - cx) / (w / 2);
+                if (e > 0) blk(x, y, [255, 246, 200], fade * Math.min(1, e * 2));
+              }
+            }
+          });
+        }
+
+        // 3. A little rainbow in the spray at the foot of the falls, at the very end.
+        const rb = Math.max(0, Math.min(1, (T - 0.75) / 0.25));
+        if (rb > 0) {
+          const cx = 486, cy = 470, R = 92, band = 3;
+          const BOW = [[236, 70, 64], [246, 150, 56], [250, 226, 88], [104, 206, 104], [76, 140, 240], [140, 96, 220]];
+          const r1 = R + BOW.length * band;
+          for (let y = cy - r1; y < 410; y++) for (let x = cx - r1; x <= cx + r1; x++) {
+            const d = Math.hypot((x & ~1) - cx, (y & ~1) - cy), k = Math.floor((r1 - d) / band);
+            if (k >= 0 && k < BOW.length) mix(x, y, BOW[k], 0.45 * rb * Math.min(1, (410 - y) / 50) * (0.85 + 0.15 * Math.sin(time * 0.9 + x * 0.03)));
+          }
+        }
+
+        // 4. Mist banks drifting slowly across the valley; thick at the start, gone by the end.
+        const cover = Math.max(0, 1 - T * 1.25);
+        if (cover > 0) for (let n = 0; n < 12; n++) {
+          const w = 70 + hash2(n, 9) * 90, ch = 9 + hash2(n, 3) * 10;
+          const cy = 6 + hash2(n, 4) * 90, speed = 2 + hash2(n, 7) * 3;
+          const cx = (hash2(n, 5) * 480 + time * speed) % 480 - 80;
+          const a = cover * (0.35 + 0.3 * hash2(n, 6));
+          const x0 = Math.floor((cx - w / 2) * K), x1 = Math.ceil((cx + w / 2) * K), y0 = Math.floor((cy - ch) * K), y1 = Math.ceil((cy + ch) * K);
+          for (let y = Math.max(0, y0) & ~1; y < Math.min(576, y1); y += 2) for (let x = Math.max(0, x0) & ~1; x < Math.min(W, x1); x += 2) {
+            const dx = (x / K - cx) / (w / 2), dy = (y / K - cy) / ch, d = dx * dx + dy * dy;
+            if (d < 1) blk(x, y, [214, 222, 220], a * (1 - d) * (0.8 + 0.2 * hash2(x >> 3, (y >> 3) + n)));
+          }
+        }
+
+        // 5. Drips from the canopy: steady at first, only a few by midday.
+        const drips = Math.round(150 * Math.max(0.08, 1 - T / 0.65));
+        for (let n = 0; n < drips; n++) {
+          const sp = 380 + hash2(n, 1) * 160, y = (hash2(n, 3) * 640 + time * sp) % 640 - 40, x = Math.floor(hash2(n, 4) * 1024);
+          for (let j = 0; j < 7; j++) mix(x, y + j, [210, 222, 224], 0.4 * (1 - j / 7) + 0.1);
+        }
+      },
+    },
+  },
 };
