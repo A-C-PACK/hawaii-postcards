@@ -851,22 +851,22 @@ function setup() {
   return new Promise(resolve => {
     const p = panel(header("📔", "Your field journal") +
       `<div class="form">
-        <label for="fName">Your name</label><input id="fName" type="text" maxlength="30" value="${esc(S.name)}" placeholder="optional">
+        <label for="fName">Your name</label><input id="fName" type="text" maxlength="30" value="${esc(S.name)}" placeholder="First and last name" required autocomplete="name">
         <label for="fMajor">Your major</label><select id="fMajor"><option value="">Choose your major…</option>
           ${MAJORS.map(m => `<option${m === S.major ? " selected" : ""}>${esc(m)}</option>`).join("")}</select>
         <span>Week ${WEEK}</span><div class="chips" id="fWords"><span class="note">Your 10 words appear here.</span></div>
         <span>Your goal</span><div class="goals">${GOALS.map(g => `<label><input type="radio" name="goal" value="${g.id}"${g.id === S.goal ? " checked" : ""}> ${esc(g.text())}</label>`).join("")}</div>
       </div>
       <div class="row"><span class="grow note">You can change these later by starting a new game.</span><button type="button" class="primary" disabled>Let's go ▶</button></div>`);
-    const sel = $("#fMajor", p), go = $(".row button", p);
+    const sel = $("#fMajor", p), name = $("#fName", p), go = $(".row button", p);
     const refresh = () => {
       $("#fWords", p).innerHTML = sel.value ? WEEKS[sel.value][WEEK - 1].map(w => `<span class="chip">${esc(w)}</span>`).join("") : `<span class="note">Your 10 words appear here.</span>`;
-      go.disabled = !(sel.value && p.querySelector("input[name=goal]:checked"));
+      go.disabled = !(name.value.trim() && sel.value && p.querySelector("input[name=goal]:checked"));
     };
-    sel.onchange = refresh; p.querySelectorAll("input[name=goal]").forEach(r => (r.onchange = refresh));
+    name.oninput = refresh; sel.onchange = refresh; p.querySelectorAll("input[name=goal]").forEach(r => (r.onchange = refresh));
     refresh();
     go.onclick = () => {
-      S.name = $("#fName", p).value.trim(); S.major = sel.value; S.goal = p.querySelector("input[name=goal]:checked").value;
+      S.name = name.value.trim(); S.major = sel.value; S.goal = p.querySelector("input[name=goal]:checked").value;
       save(); p.hidden = true; resolve();
     };
     setTimeout(() => $("#fName", p).focus(), 60);
@@ -889,7 +889,7 @@ async function main() {
   requestAnimationFrame(loop);
   const startFresh = await titleScreen();
   if (startFresh) { S = fresh(); save(); await Scene.load(PLACE); Scene.T = Scene.target = S.T; }
-  if (!S.major || !S.goal) await setup();
+  if (!S.name || !S.major || !S.goal) await setup();        // a save from before the name was required asks for it once
   $("#hud").hidden = false;
   for (let i = S.stage; i < STAGES.length; i++) {
     S.stage = i; save(); updateHud(STAGES[i]);
