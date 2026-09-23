@@ -500,4 +500,106 @@ const PLACES = {
       },
     },
   },
+  7: {
+    id: "pali",
+    name: "Nuʻuanu Pali Lookout",
+    when: "afternoon",
+    clock: "3:30 p.m.",
+    music: "music/sunset_breeze.mp3",
+    plates: ["showers", "drizzle", "clearing"].map(n => `plates/pali_${n}.png`),
+    nosun: "plates/pali_nosun.png",
+    granola: 17,
+    kevinAfter: "random",                   // a tiny turtle far below in Kāneʻohe Bay, now and then
+    act: {
+      sign: ["🪧", "Lookout sign"], card: ["✉️", "Postcard"], pool: ["🌬️", "Wind gusts"],
+      kevin: ["🐢", "Kevin"], shells: ["🌧️", "Raindrops"], sun: ["🌈", "Rainbow"],
+    },
+    signLabel: "lookout-sign",
+    shellsTitle: "Raindrops on the wall",
+    reflectTitle: "Rainbow reflection",
+    reflectIcon: "🌈",
+    photoAlt: "A rainbow over the windward side from the Nuʻuanu Pali Lookout",
+    scene: {
+      horizon: 20,
+      isWater: (r, g, b) => b > r + 45 && g > r + 15,
+      isGlint: (r, g, b) => (r + g + b) / 3 > 215 && b >= r + 6,   // reef foam and sparkles in the bay
+      shimmer: [0.02, 0.05, 0.9],           // bright, soft painting: gentle
+      glintWithSun: true,                   // the bay only sparkles once the showers pass
+      sunFade: [0.6, 1],                    // (no painted sun: it is behind the lookout)
+      risingSun: null,
+      stars: false,
+      sparkle: [170, 70],                   // over the valley, under the rainbow
+      spray: [],
+      whale: null,
+      kevin: [150, 48],                     // far below in the bay
+      ledge: 168,                           // the sprites sit on the wet terrace, bottom left
+      player: 4, tavita: 18,
+      shade: [[150, 155, 165], [205, 208, 214], [255, 255, 255]],   // rain → drizzle → clear
+      birds: [[52, 56, 62], [46, 50, 56], [40, 42, 48]],            // dark ʻiwa-like shapes over the green
+      // Signature animation: low clouds race across the cliff tops on the trade wind, slanting rain that
+      // thins as the week goes on, and a rainbow (with a faint second bow) over the valley at the end.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024, K = 3.2;
+        const mix = (x, y, c, a) => {       // blend screen pixel (x, y) of the plate toward colour c
+          x |= 0; y |= 0; if (x < 0 || x >= W || y < 0 || y >= 576 || a <= 0) return;
+          const o = (y * W + x) * 4, f = Math.min(1, a);
+          h.px(x, y, [base[o] + (c[0] - base[o]) * f, base[o + 1] + (c[1] - base[o + 1]) * f, base[o + 2] + (c[2] - base[o + 2]) * f]);
+        };
+
+        // 1. Rainbow: centred on the point opposite the sun (below the frame), so only the top of the arc
+        //    shows; it stands over the valley and fades out toward the forest in front of the lookout.
+        const rb = Math.max(0, Math.min(1, (T - 0.72) / 0.28));
+        if (rb > 0) {
+          const cx = 540, cy = 600, R = 470, band = 5;
+          const BOW = [[236, 70, 64], [246, 150, 56], [250, 226, 88], [104, 206, 104], [76, 140, 240], [140, 96, 220]];
+          const arc = (r0, cols, a0) => {
+            const r1 = r0 + cols.length * band;
+            for (let y = Math.max(0, cy - r1); y < 420; y++) {
+              const dy = cy - y, fade = a0 * rb * Math.min(1, (420 - y) / 150) * (0.85 + 0.15 * Math.sin(time * 0.8 + y * 0.02));
+              const xo = Math.sqrt(Math.max(0, r1 * r1 - dy * dy)), xi = dy < r0 ? Math.sqrt(r0 * r0 - dy * dy) : 0;
+              for (const s of [-1, 1]) for (let x = Math.floor(cx + s * xi); s > 0 ? x <= cx + xo : x >= cx - xo; x += s) {
+                const d = Math.hypot((x & ~1) - cx, (y & ~1) - cy);   // 2-px steps keep the bands chunky
+                const k = Math.floor((r1 - d) / band);
+                if (k >= 0 && k < cols.length) mix(x, y, cols[k], fade);
+              }
+            }
+          };
+          arc(R, BOW, 0.5);
+          arc(R + 70, [...BOW].reverse(), 0.16);   // the fainter second bow, colours reversed
+        }
+
+        // 2. Low clouds racing across the cliff tops (right to left, with the trade wind). Thick grey
+        //    at the start; a few white wisps still stream over the ridges at the end.
+        const cover = Math.max(0.12, 1 - T * 1.1), grey = 150 + 100 * T;
+        for (let n = 0; n < 14; n++) {
+          const w = 50 + hash2(n, 9) * 70, ch = 7 + hash2(n, 3) * 8;
+          const cy = 2 + hash2(n, 4) * (n < 9 ? 26 : 50), speed = 9 + hash2(n, 7) * 8;
+          const cx = 380 - ((hash2(n, 5) * 480 + time * speed) % 480);
+          const a = cover * (0.45 + 0.35 * hash2(n, 6)) * (n < 9 ? 1 : 1 - T);
+          if (a < 0.02) continue;
+          const x0 = Math.floor((cx - w / 2) * K), x1 = Math.ceil((cx + w / 2) * K), y0 = Math.floor((cy - ch) * K), y1 = Math.ceil((cy + ch) * K);
+          for (let y = Math.max(0, y0); y < Math.min(360, y1); y += 2) for (let x = Math.max(0, x0); x < Math.min(W, x1); x += 2) {
+            const dx = (x / K - cx) / (w / 2), dy = (y / K - cy) / ch, top = 0.75 + 0.25 * Math.sin(x / K * 0.3 + n);
+            const d = dx * dx + (dy < 0 ? (dy / top) ** 2 : dy * dy);
+            if (d < 1 && hash2(x >> 2, (y >> 2) + n) > d * 0.9) {
+              const c = [grey, grey + 3, grey + 8], f = a * (1 - d * d);
+              mix(x, y, c, f); mix(x + 1, y, c, f); mix(x, y + 1, c, f); mix(x + 1, y + 1, c, f);
+            }
+          }
+        }
+
+        // 3. Rain: slanting streaks blown in from the sea, heavy at first, gone once the showers pass.
+        const rain = Math.max(0, 1 - T / 0.7);
+        if (rain > 0) {
+          const drops = Math.round(380 * rain), c = [196, 204, 214];
+          for (let n = 0; n < drops; n++) {
+            const sp = 520 + hash2(n, 1) * 220, len = 10 + hash2(n, 2) * 8;
+            const y = (hash2(n, 3) * 700 + time * sp) % 700 - 60, x = (hash2(n, 4) * 1200 - y * 0.35 - time * 60) % 1200;
+            const xx = x < 0 ? x + 1200 : x;
+            for (let j = 0; j < len; j++) mix(xx - j * 0.35, y + j, c, 0.36 * (1 - j / len) + 0.12);
+          }
+        }
+      },
+    },
+  },
 };
