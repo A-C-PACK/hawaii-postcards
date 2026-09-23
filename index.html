@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hawaiʻi Postcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="scene" width="1024" height="576"></canvas>
+
+  <div id="hud" hidden>
+    <div id="where"></div>
+    <ol id="steps"></ol>
+    <div id="hudRight">
+      <span id="granola" title="Tavita's granola bars">🍫 <b>11</b></span>
+      <button id="btnSave" title="Save my progress to a file">💾</button>
+      <button id="btnJournal" title="Word journal (J)">📔</button>
+      <button id="btnSound" title="Sound (M)" aria-haspopup="true" aria-expanded="false">🔊</button>
+      <div id="soundMenu" role="menu" hidden></div>
+    </div>
+  </div>
+
+  <div id="bubble" hidden><img alt=""><span></span></div>
+  <div id="panel" hidden></div>
+  <button id="panelTab" type="button" hidden>📋 Show task <kbd>H</kbd></button>
+
+  <div id="dialog" hidden>
+    <div class="face"><img alt=""></div>
+    <div class="body"><div class="who"></div><div class="text"></div></div>
+    <div class="more">▶</div>
+  </div>
+
+  <div id="title">
+    <h1>Hawai<span class="okina">ʻ</span>i Postcards</h1>
+    <p class="sub"></p>
+    <div class="weeks" role="group" aria-label="Choose a week"></div>
+    <div class="buttons"></div>
+    <div class="progress">
+      <button type="button" class="save-prog">💾 Save progress</button>
+      <button type="button" class="load-prog">📂 Load progress</button>
+      <input type="file" accept=".json,application/json" hidden>
+      <p class="msg" role="status"></p>
+    </div>
+    <p class="hint">Headphones recommended · ← → choose a week · Space / Enter to continue · M sound · J journal</p>
+  </div>
+
+  <div id="journal" hidden></div>
+  <div id="fade"></div>
+</div>
+<script src="data.js"></script>
+<script src="places.js"></script>
+<script src="scene.js"></script>
+<script src="gif.js"></script>
+<script src="audio.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
