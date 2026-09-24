@@ -710,4 +710,126 @@ const PLACES = {
       },
     },
   },
+
+  9: {
+    id: "laniakea",
+    name: "Laniakea Beach",
+    when: "late afternoon",
+    clock: "5:15 p.m.",
+    music: "music/ocean_breeze.mp3",
+    plates: ["afternoon", "golden", "sunset"].map(n => `plates/laniakea_${n}.png`),
+    nosun: "plates/laniakea_nosun.png",
+    granola: 20,
+    kevinAfter: "ashore",                   // after his round Kevin crawls over the rocks to rest on the sand with the other honu
+    act: {
+      sign: ["🪧", "Beach sign"], card: ["✉️", "Postcard"], pool: ["🌊", "Big waves"],
+      kevin: ["🐢", "Kevin"], shells: ["✍️", "Sand writing"], sun: ["🌇", "Sunset"],
+    },
+    signLabel: "beach-sign",
+    shellsTitle: "Words in the sand",
+    reflectTitle: "Sunset reflection",
+    reflectIcon: "🌇",
+    photoAlt: "Sunset at Laniakea Beach on the North Shore, with big waves on the reef and honu resting on the sand",
+    scene: {
+      horizon: 21,
+      isWater: (r, g, b) => b > r + 45 && g > r + 15,
+      isGlint: (r, g, b) => (r + g + b) / 3 > 215 && b >= r,   // white foam on the breakers, not the orange sand
+      shimmer: [0.02, 0.05, 0.9],           // soft painting: gentle
+      glintWithSun: false,                  // the surf twinkles all afternoon
+      sunFade: [0.86, 1],                   // the code sun sets onto the horizon, then dissolves into the painted one
+      // A setting sun: it starts above the frame (from: -22) and comes down all week, white → gold → orange.
+      risingSun: { x: 158, y: 11, rx: 11, ry: 10, from: -22, t0: 0,
+                   colors: [[255, 252, 238], [255, 246, 206], [255, 214, 150]] },
+      stars: false,
+      sparkle: [158, 26],                   // on the sea just below the sun
+      spray: [[200, 56], [118, 64], [244, 66], [58, 64]],   // the breakers on the reef
+      whale: null,
+      kevin: [292, 76],                     // in the water left of the rocks on the right, above the panels
+      kevinBeach: [[292, 76], [296, 88], [298, 102], [294, 114], [293, 127]],   // over the rocks to the sand
+      ledge: 168,                           // the sprites sit on the sand, bottom left
+      player: 4, tavita: 18,
+      shade: [[248, 248, 250], [255, 226, 192], [236, 176, 164]],   // bright afternoon → golden → rosy sunset
+      birds: [[56, 66, 86], [70, 58, 70], [60, 42, 58]],
+      // Signature animation: sets of big winter waves peel along the reef (a bright line of whitewater runs
+      // across each breaker, with spray), two honu rest on the sand behind the volunteers' rope line, and
+      // Kevin joins them after his round.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024, K = 3.2;
+        const mix = (x, y, c, a) => {       // blend screen pixel (x, y) of the plate toward colour c
+          x |= 0; y |= 0; if (x < 0 || x >= W || y < 0 || y >= 576 || a <= 0) return;
+          const o = (y * W + x) * 4, f = Math.min(1, a);
+          h.px(x, y, [base[o] + (c[0] - base[o]) * f, base[o + 1] + (c[1] - base[o + 1]) * f, base[o + 2] + (c[2] - base[o + 2]) * f]);
+        };
+        const blk = (x, y, c, a) => { mix(x, y, c, a); mix(x + 1, y, c, a); mix(x, y + 1, c, a); mix(x + 1, y + 1, c, a); };
+
+        // 1. Wave sets: every 15 s three big waves break one after another. As each breaks, the painting's own
+        //    white water along that breaker line lights up, peeling from right to left, with spray thrown up
+        //    just behind the curl; the glow fades slowly behind it.
+        const foam = mixC([255, 255, 255], [255, 238, 220], T);
+        const LINES = [[176, 1.0], [206, 0.9], [232, 0.75]];           // breaker row (screen pixels), strength
+        const phase = time % 15;
+        LINES.forEach(([row, s], i) => {
+          const t = phase - i * 2.4;
+          if (t < 0 || t > 6) return;
+          const head = 1080 - t * 230;                                  // the curl runs left across the screen
+          const fadeIn = Math.min(1, t * 1.5), fadeOut = Math.min(1, (6 - t) / 2);
+          for (let x = Math.max(0, Math.floor(head) & ~1); x < Math.min(W, head + 420); x += 2) {
+            const behind = (x - head) / 420, a0 = s * fadeIn * fadeOut * (1 - behind) ** 1.5;
+            for (let y = row - 16; y < row + 18; y += 2) {
+              const o = (y * W + x) * 4, l = (base[o] + base[o + 1] + base[o + 2]) / 3;
+              if (l > 120) blk(x, y, foam, a0 * 0.8 * Math.min(1, (l - 120) / 60));   // the painted foam brightens
+            }
+          }
+          // spray: a short-lived plume just behind the curl
+          for (let n = 0; n < 60; n++) {
+            const d = hash2(n, 1), sx = head + 8 + d * 90, rise = hash2(n, 2) * 28 * fadeIn * (1 - d) ** 0.7;   // tallest at the curl
+            const sy = row - 12 - rise + Math.sin(time * 3 + n) * 1.5;
+            if (sx >= 0 && sx < W && hash2(n, Math.floor(time * 8)) > 0.3) blk(sx, sy, foam, 0.55 * s * fadeOut * (1 - rise / 30));
+          }
+        });
+
+        // 2. The volunteers' rope line on the sand in front of the turtles: short posts with a sagging rope.
+        const rope = mixC([226, 214, 190], [238, 196, 150], T), post = mixC([96, 72, 52], [84, 56, 48], T);
+        const POSTS = [[284, 151], [296, 153], [308, 155], [320, 157]];
+        for (let i = 0; i < POSTS.length - 1; i++) {
+          const [ax, ay] = POSTS[i], [bx, by] = POSTS[i + 1];
+          for (let x = ax * K; x <= bx * K; x += 2) {
+            const f = (x / K - ax) / (bx - ax), sag = Math.sin(f * Math.PI) * 4;
+            h.blk(x, Math.round((ay - 4 + (by - ay) * f) * K + sag), 2, rgba(rope));
+          }
+        }
+        for (const [px, py] of POSTS) h.blk(px * K - 1, (py - 5) * K, 4, rgba(post)), h.blk(px * K - 1, (py - 5) * K + 4, 4, rgba(post)),
+          h.blk(px * K - 1, (py - 5) * K + 8, 4, rgba(post)), h.blk(px * K - 1, (py - 5) * K + 12, 4, rgba(post));
+
+        // 3. Two honu resting on the sand behind the rope (they were here first); Kevin joins them later.
+        this.honu(290, 138, 1, time, T, h);
+        this.honu(306, 146, -1, time + 7, T, h);
+      },
+      // A resting honu, drawn in 2-pixel blocks at layout (lx, ly) (= where the shell meets the sand), facing
+      // dir (1 = right). The engine uses it for Kevin too once he is on the sand. Now and then the head lifts.
+      honu(lx, ly, dir, time, T, h) {
+        const K = 3.2, cx = Math.round(lx * K / 2) * 2, cy = Math.round(ly * K / 2) * 2;
+        const light = keyC([[1, 1, 1], [1.05, 0.96, 0.86], [1.0, 0.84, 0.8]], T);
+        const col = c => rgba([Math.min(255, c[0] * light[0]), Math.min(255, c[1] * light[1]), Math.min(255, c[2] * light[2])]);
+        const B = (x, y, c) => h.blk(cx + x * dir - (dir < 0 ? 2 : 0), cy + y, 2, col(c));
+        const lift = Math.sin(time * 0.3) > 0.9 ? 2 : 0;
+        for (let x = -20; x <= 22; x += 2) B(x, 2, [150, 118, 88]);                     // shadow on the sand
+        for (let x = -18; x <= 18; x += 2) B(x, 4 - 2, [150, 118, 88]);
+        // flippers: rear (left) and front (right), splayed on the sand
+        [[-18, 0], [-20, 2], [-16, 2]].forEach(([x, y]) => B(x, y, [92, 90, 64]));
+        [[10, 0], [12, 2], [14, 2], [16, 2], [18, 4]].forEach(([x, y]) => B(x, y, [104, 100, 70]));
+        // shell: a low dome, olive brown with darker scute lines and a light rim
+        for (let x = -16; x <= 16; x += 2) {
+          const top = Math.round(Math.sqrt(1 - (x / 17) ** 2) * 10);
+          for (let y = -top; y <= 0; y += 2) {
+            const rim = y === 0 || y > -2, scute = (x + 16) % 10 < 2 && y < -2, hi = y <= -top + 2 && x < 4;
+            B(x, y, rim ? [150, 128, 78] : scute ? [70, 56, 34] : hi ? [140, 116, 70] : [104, 84, 50]);
+          }
+        }
+        // head and neck: rounded, with a pale jaw and a dark eye
+        [[18, -2], [20, -2], [20, -4], [22, -4], [22, -2], [24, -4], [24, -2], [22, -6]].forEach(([x, y]) => B(x, y - lift, [120, 118, 80]));
+        B(22, 0 - lift, [196, 186, 140]); B(24, 0 - lift, [196, 186, 140]); B(22, -4 - lift, [30, 30, 24]);
+      },
+    },
+  },
 };

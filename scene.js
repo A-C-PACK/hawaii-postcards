@@ -191,9 +191,11 @@ const Scene = {
     if (L.draw) L.draw(this, T, time, { px, put, blk, cloud });
     // The sun rises from below the horizon to where the painting has it.
     const fSun = this.sunAt(T), sun = L.risingSun;
-    if (sun && T > 0.5 && fSun < 1) {
-      const k = Math.min(1, (T - 0.5) / (L.sunFade[0] - 0.5)), cx = sun.x * K, cy = (sun.y + (1 - k) * 16) * K;
-      const rx = sun.rx * K, ry = sun.ry * K, sc = keyC(SUN_C, T), rim = mixC(sc, [255, 170, 90], 0.5);
+    // (A setting sun: `from` < 0 starts it that many units higher, `t0` is when it appears, `colors` its keys.)
+    const t0 = sun && sun.t0 !== undefined ? sun.t0 : 0.5;
+    if (sun && T >= t0 && fSun < 1) {
+      const k = Math.min(1, (T - t0) / (L.sunFade[0] - t0)), cx = sun.x * K, cy = (sun.y + (1 - k) * (sun.from ?? 16)) * K;
+      const rx = sun.rx * K, ry = sun.ry * K, sc = keyC(sun.colors || SUN_C, T), rim = mixC(sc, [255, 170, 90], 0.5);
       for (let y = Math.floor(cy - ry); y < this.HZ; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
         const dx = (x - cx) / rx, dy = (y - cy) / ry, d = dx * dx + dy * dy;
         if (d <= 1 && hash2(x >> 2, y >> 2) >= fSun) px(x, y, d > 0.86 ? rim : sc);
@@ -233,7 +235,8 @@ const Scene = {
       }
       const onSand = path && a > 0.25, ky = ky0 - (onSand ? 1 : Math.round(up * 2));
       const shell = mixC([30, 55, 45], [70, 100, 60], T), head = mixC([45, 60, 50], [130, 140, 90], T);
-      if (up > 0.3) {
+      if (up > 0.3 && L.honu && onSand) L.honu(kx, ky, 1, time, T, { px, put, blk });   // the place's own resting-honu sprite
+      else if (up > 0.3) {
         if (onSand) for (let n = -5; n <= 5; n++) put(kx + n, ky + 1, mixC([150, 120, 90], [196, 160, 112], T));   // shadow
         for (let n = -4; n <= 4; n++) put(kx + n, ky, shell);
         for (let n = -2; n <= 2; n++) put(kx + n, ky - 1, shell);
