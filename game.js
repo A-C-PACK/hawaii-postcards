@@ -797,11 +797,25 @@ function titleScreen() {
   return new Promise(resolve => {
     const t = $("#title"), btns = $(".buttons", t), picker = $(".weeks", t);
     let busy = false;
+    // Week switcher: ‹ current week › — click the middle for the full list of weeks.
+    const list = () => $(".list", picker), cur = () => $(".cur", picker);
+    const isOpen = () => !list().hidden;
+    const setOpen = open => {
+      list().hidden = !open; cur().setAttribute("aria-expanded", open);
+      if (open) { const on = $(".on", list()); on.focus(); on.scrollIntoView({ block: "nearest" }); }
+    };
     const draw = () => {
       $(".sub", t).innerHTML = `Week ${WEEK} · ${okinaHTML(PLACE.name)} · ${esc(PLACE.when)}`;
-      picker.innerHTML = BUILT.map(n => `<button type="button" data-n="${n}" aria-pressed="${n === WEEK}"${n === WEEK ? ' class="on"' : ""}>
-        <small>Week ${n}${weekDone(n) ? " ✓" : ""}</small><span>${okinaHTML(PLACES[n].name)}</span></button>`).join("");
-      picker.querySelectorAll("button").forEach(b => (b.onclick = () => pickWeek(+b.dataset.n)));
+      const i = BUILT.indexOf(WEEK);
+      picker.innerHTML = `<button type="button" class="step" data-d="-1" aria-label="Previous week"${i > 0 ? "" : " disabled"}>‹</button>
+        <button type="button" class="cur" aria-haspopup="listbox" aria-expanded="false">
+          <small>Week ${WEEK}${weekDone(WEEK) ? " ✓" : ""} ▾</small><span>${okinaHTML(PLACE.name)}</span></button>
+        <button type="button" class="step" data-d="1" aria-label="Next week"${i < BUILT.length - 1 ? "" : " disabled"}>›</button>
+        <div class="list" role="listbox" aria-label="Choose a week" hidden>${BUILT.map(n => `<button type="button" role="option" data-n="${n}"
+          aria-selected="${n === WEEK}"${n === WEEK ? ' class="on"' : ""}><small>Week ${n}</small><span>${okinaHTML(PLACES[n].name)}</span><b>${weekDone(n) ? "✓" : ""}</b></button>`).join("")}</div>`;
+      picker.querySelectorAll(".step").forEach(b => (b.onclick = () => pickWeek(BUILT[i + +b.dataset.d], `.step[data-d="${b.dataset.d}"]`)));
+      cur().onclick = () => setOpen(!isOpen());
+      list().querySelectorAll("button").forEach(b => (b.onclick = () => { setOpen(false); pickWeek(+b.dataset.n, ".cur"); }));
       const resumable = S.major && S.goal && S.stage > 0;
       btns.innerHTML = resumable
         ? `<button type="button" class="primary go">Continue</button><button type="button" class="new">Start over</button>`
@@ -810,12 +824,15 @@ function titleScreen() {
       if (resumable) $(".new", btns).onclick = () => go(true);
       Sound.setMusic(PLACE.music);
     };
-    const pickWeek = async n => {
-      if (busy || n === WEEK) return;
+    // refocus: which switcher button gets keyboard focus back after the redraw.
+    const pickWeek = async (n, refocus) => {
+      if (busy || n === undefined || n === WEEK) return;
       busy = true; setWeek(n);
       await Scene.load(PLACE); showWeekState();
       draw(); busy = false;
+      if (refocus) { const b = $(refocus, picker); (b.disabled ? cur() : b).focus(); }
     };
+    t.onpointerdown = e => { if (isOpen() && !picker.contains(e.target)) setOpen(false); };
     const go = fresh => { if (busy) return; Sound.start(); t.hidden = true; keyHook = null; resolve(fresh); };
     const msg = $(".progress .msg", t), fileIn = $(".progress input", t);
     $(".save-prog", t).onclick = () => { saveProgressFile(); msg.className = "msg"; msg.textContent = "Saved! Keep the file somewhere safe (email it to yourself, or put it in OneDrive)."; };
@@ -831,6 +848,20 @@ function titleScreen() {
       } catch (err) { msg.className = "msg bad"; msg.textContent = err.message; }
     };
     keyHook = e => {
+      if (isOpen()) {   // list open: ↑ ↓ move, Enter / Space choose, Esc closes
+        const opts = [...list().querySelectorAll("button")], k = opts.indexOf(document.activeElement);
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          opts[Math.max(0, Math.min(opts.length - 1, k + (e.key === "ArrowDown" ? 1 : -1)))].focus();
+        }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (k >= 0) opts[k].click(); }
+        if (e.key === "Escape") { setOpen(false); cur().focus(); }
+        return;
+      }
+      if (e.key === "ArrowDown" || ((e.key === "Enter" || e.key === " ") && document.activeElement === cur())) {
+        e.preventDefault(); setOpen(true); return;
+      }
+      if ((e.key === "Enter" || e.key === " ") && document.activeElement.matches(".weeks .step")) return;   // let ‹ › click
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(false); }
       const i = BUILT.indexOf(WEEK);
       if (e.key === "ArrowRight" && i < BUILT.length - 1) pickWeek(BUILT[i + 1]);
