@@ -316,7 +316,8 @@ async function mynah(lineId, n) {
   $("#panel").hidden = true; $("#dialog").hidden = true;
   await sleep(1700);
   const b = $("#bubble");
-  b.innerHTML = (IMAGES.portrait_mynah ? `<img src="${IMAGES.portrait_mynah}" alt="">` : `<span class="emo">🐦</span>`) + `<span>SQUAWK! 🍫</span>`;
+  const th = PLACE.thief || { img: "portrait_mynah", emoji: "🐦", call: "SQUAWK!" };   // (Kauaʻi: a rooster)
+  b.innerHTML = (IMAGES[th.img] ? `<img src="${IMAGES[th.img]}" alt="">` : `<span class="emo">${th.emoji}</span>`) + `<span>${th.call} 🍫</span>`;
   b.hidden = false;
   Sound.chime(false);
   await sleep(1400);

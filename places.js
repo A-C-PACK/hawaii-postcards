@@ -832,4 +832,234 @@ const PLACES = {
       },
     },
   },
+  10: {
+    id: "kaena",
+    name: "Kaʻena Point",
+    when: "sunset",
+    clock: "6:15 p.m.",
+    music: "music/sunset_breeze.mp3",
+    plates: ["sunset", "dusk", "twilight"].map(n => `plates/kaena_${n}.png`),
+    nosun: "plates/kaena_twilight.png",     // (no painted sun in any plate: the code sun sets below the sea)
+    granola: 22,
+    kevinAfter: "random",
+    act: {
+      sign: ["🪧", "Reserve sign"], card: ["✉️", "Postcard"], pool: ["🪶", "Albatrosses"],
+      kevin: ["🐢", "Kevin"], shells: ["⭐", "First stars"], sun: ["🌆", "Dusk"],
+    },
+    signLabel: "reserve-sign",
+    shellsTitle: "Words in the first stars",
+    reflectTitle: "Dusk reflection",
+    reflectIcon: "🌆",
+    photoAlt: "Dusk at Kaʻena Point, the western tip of Oʻahu, with the first stars over the sea, albatrosses and a monk seal resting on the rocks",
+    scene: {
+      horizon: 16,
+      classify: 0,                          // the end state is too dark to tell foam from sea: classify from the sunset plate
+      isWater: (r, g, b) => (g > r + 10 && b > r + 25) || (r > 180 && g > 120 && r - b > 80),   // sea + the sun's glitter
+      isGlint: (r, g, b) => (r + g + b) / 3 > 185 && b >= r - 10,                                // foam on the rocks
+      shimmer: [0.05, -0.03, 0.85],         // the wave lines fade as it gets dark
+      glintWithSun: false,
+      sunFade: [-1, -0.5],                  // (always "sun on": the last plate is the twilight itself)
+      risingSun: null,                      // the setting sun is drawn in the draw hook
+      stars: false,                         // (the engine's stars fade out; these fade in, in the draw hook)
+      sparkle: [155, 22],
+      spray: [[75, 66], [219, 66], [256, 68], [47, 58], [140, 66]],
+      whale: null,
+      kevin: [205, 44],                     // out on the open sea, above the panels
+      kevinT: T => 0.55 - 0.45 * T,         // he gets darker as the light goes (the engine default brightens him)
+      ledge: 168,                           // the sprites sit on the sand by the stone path, bottom left
+      player: 4, tavita: 18,
+      shade: [[255, 222, 196], [196, 170, 196], [128, 132, 170]],   // sunset → dusk → twilight
+      birds: [[70, 46, 62], [52, 40, 64], [28, 30, 52]],
+      // Signature animation: the sun sinks into the sea, then the stars come out; two mōlī (Laysan albatross)
+      // glide over the point, a Hawaiian monk seal sleeps on the lava shelf, and spinner dolphins leap offshore.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024, K = 3.2, HZ = 51;
+        const mix = (x, y, c, a) => {       // blend screen pixel (x, y) of the plate toward colour c
+          x |= 0; y |= 0; if (x < 0 || x >= W || y < 0 || y >= 576 || a <= 0) return;
+          const o = (y * W + x) * 4, f = Math.min(1, a);
+          h.px(x, y, [base[o] + (c[0] - base[o]) * f, base[o + 1] + (c[1] - base[o + 1]) * f, base[o + 2] + (c[2] - base[o + 2]) * f]);
+        };
+        const B = (x, y, c) => h.blk(Math.round(x / 2) * 2, Math.round(y / 2) * 2, 2, rgba(c));
+
+        // 1. The setting sun: most of the disc is above the sea at the start; it sinks below the horizon by
+        //    about a third of the way through, turning from gold to deep orange, with a warm halo that fades.
+        const k = clamp(T / 0.32, 0, 1), cx = 498, rx = 31, ry = 29, cy = 34 + k * (ry + 22);
+        if (k < 1) {
+          const halo = 1 - k;
+          for (let y = 0; y < HZ; y += 2) for (let x = 330; x < 670; x += 2) {
+            const d = Math.hypot((x - cx) / 170, (y - cy) / 60);
+            if (d < 1) mix(x, y, [255, 196, 130], 0.35 * halo * (1 - d) ** 2), mix(x + 1, y, [255, 196, 130], 0.35 * halo * (1 - d) ** 2),
+              mix(x, y + 1, [255, 196, 130], 0.35 * halo * (1 - d) ** 2), mix(x + 1, y + 1, [255, 196, 130], 0.35 * halo * (1 - d) ** 2);
+          }
+          const core = mixC([255, 236, 186], [255, 150, 80], k), rim = mixC([255, 196, 120], [236, 100, 60], k);
+          for (let y = Math.floor(cy - ry); y < HZ; y++) for (let x = cx - rx; x <= cx + rx; x++) {
+            const dx = (x - cx) / rx, dy = (y - cy) / ry, d = dx * dx + dy * dy;
+            if (d <= 1) h.px(x, y, d > 0.8 ? rim : core);
+          }
+        }
+
+        // 2. Stars come out after the sun is down (the sky band is thin: a few dozen, above the afterglow).
+        const starA = clamp((T - 0.5) / 0.4, 0, 1);
+        if (starA > 0) for (let n = 0; n < 60; n++) {
+          const x = Math.floor(hash2(n, 11) * 1024), y = 3 + Math.floor(hash2(n, 12) * 34);
+          const tw = 0.6 + 0.4 * Math.sin(time * (1.5 + hash2(n, 13)) + n);
+          const a = starA * tw * clamp((hash2(n, 14) * 1.6) - (1 - starA) * 0.8, 0, 1);
+          if (a > 0.15) { mix(x, y, [255, 250, 236], a); mix(x + 1, y, [255, 250, 236], a * 0.8); mix(x, y + 1, [255, 250, 236], a * 0.8); mix(x + 1, y + 1, [255, 250, 236], a * 0.6); }
+        }
+
+        // 3. Spinner dolphins, from about halfway: every 9 s a pod of three leaps one after another out at sea.
+        if (T > 0.4) {
+          const cyc = Math.floor(time / 9), ph = time % 9, px0 = 520 + hash2(cyc, 1) * 360, py = 96 + hash2(cyc, 2) * 30;
+          const body = mixC([96, 104, 124], [70, 78, 108], T), belly = mixC([190, 190, 200], [140, 146, 170], T);
+          for (let j = 0; j < 3; j++) {
+            const t = ph - j * 0.55;
+            if (t < 0 || t > 1.4) continue;
+            const f = t / 1.1, x0 = px0 + j * 26 + f * 34;
+            if (f <= 1) {                     // in the air: a short arc; the body tilts nose-up, then nose-down
+              const y0 = py - Math.sin(f * Math.PI) * 26, tilt = Math.cos(f * Math.PI);
+              for (let i = -7; i <= 7; i++) B(x0 + i * 2, y0 - i * tilt * 1.2, i > 3 ? belly : body);
+              B(x0 - 2, y0 - 3, body); B(x0 - 16, y0 + 7 * tilt * 1.2 - 2, body);      // fin and tail
+            }
+            const sp = f > 0.9 ? (t - 1) / 0.4 : f < 0.12 ? 1 - f / 0.12 : -1;   // splash going in and coming out
+            if (sp >= 0 && sp <= 1) for (let n = 0; n < 8; n++) B((f < 0.5 ? px0 + j * 26 : x0) + (n - 4) * 3, py - hash2(n, j) * 8 * (1 - sp), [236, 240, 250]);
+          }
+        }
+
+        // 4. The monk seal asleep on the flat lava shelf (well away from us): a long grey-brown body; now and
+        //    then it lifts its head or flicks a rear flipper.
+        this.seal(318, 226, time, T, h);
+
+        // 5. Two mōlī gliding in long, slow loops over the point, wings held straight, tilting as they turn.
+        for (let n = 0; n < 2; n++) {
+          const a = time * (0.09 + n * 0.025) + n * 2.6;
+          const x = 520 + Math.sin(a) * (360 - n * 60), y = 34 + n * 30 + Math.sin(a * 2) * 14 + Math.cos(a * 0.5) * 8;
+          const dir = Math.cos(a) > 0 ? 1 : -1, bank = Math.sin(a * 2) * 3;
+          this.albatross(x, y, dir, bank, T, h);
+        }
+      },
+      // A Laysan albatross from below/side, in 2-pixel blocks: white body and head, long dark wings.
+      albatross(x, y, dir, bank, T, h) {
+        const white = mixC([248, 244, 236], [140, 146, 170], T), dark = mixC([70, 60, 64], [30, 30, 46], T);
+        const B = (dx, dy, c) => h.blk(Math.round(x + dx * 1.5 * dir), Math.round(y + dy * 1.5), 3, rgba(c));
+        for (let i = -30; i <= 30; i += 2) {
+          const tip = Math.abs(i) / 30, dy = Math.round((i / 30) * bank + tip * tip * 3);
+          B(i, dy, dark); if (Math.abs(i) < 16) B(i, dy + 2, dark);
+        }
+        for (let i = -8; i <= 8; i += 2) B(i, 0, white), B(i, 2, white);
+        B(10, 0, white); B(12, 0, white); B(12, 2, [230, 190, 150]); B(14, 2, [210, 170, 140]);   // head, pale bill
+        B(-10, 2, dark); B(-12, 2, dark);                                                          // tail
+      },
+      seal(sx, sy, time, T, h) {
+        const light = mixC([1, 0.94, 0.9], [0.55, 0.6, 0.8], T);
+        const col = c => rgba([c[0] * light[0], c[1] * light[1], c[2] * light[2]]);
+        const B = (x, y, c) => h.blk(sx + x * 1.5, sy + y * 1.5, 3, col(c));
+        const lift = Math.sin(time * 0.25) > 0.93 ? 2 : 0, flick = Math.sin(time * 0.4 + 2) > 0.95 ? 2 : 0;
+        for (let x = -18; x <= 18; x += 2) B(x, 2, [40, 36, 44]);                                 // shadow
+        for (let x = -16; x <= 14; x += 2) {                                                     // body: a long low hump
+          const top = Math.round(Math.sqrt(Math.max(0, 1 - (x / 17) ** 2)) * 7 / 2) * 2;
+          for (let y = -top; y <= 0; y += 2) B(x, y, y > -2 ? [150, 146, 140] : y <= -top ? [128, 124, 122] : [104, 100, 100]);
+        }
+        [[16, -2], [18, -2], [18, -4], [20, -4], [20, -2]].forEach(([x, y]) => B(x, y - lift, [110, 106, 104]));   // head
+        B(20, -4 - lift, [30, 28, 30]); B(22, -2 - lift, [60, 56, 56]);                           // eye, nose
+        B(-18, -flick, [96, 92, 92]); B(-20, -2 - flick, [96, 92, 92]); B(-20, 0, [96, 92, 92]);  // rear flippers
+      },
+    },
+  },
+  11: {
+    id: "waimea",
+    name: "Waimea Canyon",
+    when: "late afternoon",
+    clock: "3:30 p.m.",
+    music: "music/breezy_hawaiian_groove.mp3",
+    plates: ["cloudy", "clearing", "golden"].map(n => `plates/waimea_${n}.png`),
+    nosun: "plates/waimea_golden.png",      // (no painted sun: the light is the grade itself)
+    granola: 24,
+    kevinAfter: "hidden",                   // no sea at the canyon: Kevin phones from Oʻahu
+    thief: { img: "portrait_rooster", emoji: "🐓", call: "BAWK!" },   // on Kauaʻi the snack thief is a rooster
+    act: {
+      sign: ["🪧", "Lookout sign"], card: ["✉️", "Postcard"], pool: ["🪨", "Rock layers"],
+      kevin: ["🐢", "Kevin"], shells: ["☁️", "Clouds"], sun: ["🌄", "Canyon"],
+    },
+    signLabel: "lookout-sign",
+    shellsTitle: "Words in the clouds",
+    reflectTitle: "Canyon reflection",
+    reflectIcon: "🌄",
+    photoAlt: "Waimea Canyon on Kauaʻi in late-afternoon light, with red and green canyon walls and a waterfall on the far wall",
+    scene: {
+      horizon: 0,
+      isWater: () => false,                 // (the falls are animated in the draw hook; the river is too small to shimmer)
+      isGlint: () => false,
+      shimmer: [0, 0, 1],
+      glintWithSun: true,
+      sunFade: [-1, -0.5],                  // (three plates in a row; the last is the render itself)
+      risingSun: null,
+      stars: false,
+      sparkle: [161, 58],                   // at the waterfall
+      spray: [],
+      whale: null,
+      kevin: null,
+      ledge: 168,                           // the sprites stand on the red dirt at the lookout, bottom left
+      player: 4, tavita: 18,
+      shade: [[204, 208, 214], [236, 232, 226], [255, 238, 214]],   // grey cloud light → clearing → warm afternoon sun
+      birds: [[70, 74, 80], [66, 60, 58], [60, 48, 44]],
+      // The rooster: side view facing left (comb, beak, golden neck, red-brown body, dark green tail).
+      thief: {
+        rows: ["..r.....", ".rrr....", "ykkk...G", "..kkk.GG", "..oooooG", "...oooo.", "...y.y.."],
+        col: { r: [206, 40, 40], y: [240, 190, 50], k: [228, 146, 54], o: [150, 62, 34], G: [34, 72, 62] },
+        wingRow: 4,
+      },
+      // Signature animation: cloud banks drift through the canyon (thick at the start, gone by the end), the
+      // falls flow on the far wall, and two koaʻe kea (white-tailed tropicbirds) glide below the rim.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024, K = 3.2;
+        const mix = (x, y, c, a) => {       // blend screen pixel (x, y) of the plate toward colour c
+          x |= 0; y |= 0; if (x < 0 || x >= W || y < 0 || y >= 576 || a <= 0) return;
+          const o = (y * W + x) * 4, f = Math.min(1, a);
+          h.px(x, y, [base[o] + (c[0] - base[o]) * f, base[o + 1] + (c[1] - base[o + 1]) * f, base[o + 2] + (c[2] - base[o + 2]) * f]);
+        };
+        const blk = (x, y, c, a) => { mix(x, y, c, a); mix(x + 1, y, c, a); mix(x, y + 1, c, a); mix(x + 1, y + 1, c, a); };
+
+        // 1. The falls: bright ribbons of water scroll downward, faster lower down.
+        for (let y = 84; y < 248; y += 2) for (let x = 500; x < 534; x += 2) {
+          const o = (y * W + x) * 4;
+          if (base[o] + base[o + 1] + base[o + 2] < 3 * 160) continue;
+          const col = x >> 1, n = hash2(col, Math.floor((y + hash2(col, 1) * 300 - time * (70 + y * 0.3)) / 7));
+          if (n > 0.7) blk(x, y, [255, 255, 255], 0.6);
+          else if (n < 0.2) blk(x, y, [170, 200, 214], 0.35);
+        }
+
+        // 2. Two tropicbirds: white, with two very long tail streamers, circling slowly inside the canyon.
+        for (let n = 0; n < 2; n++) {
+          const a = time * (0.13 + n * 0.04) + n * 3.1;
+          const x = 560 + Math.sin(a) * (300 - n * 90), y = 150 + n * 40 + Math.sin(a * 1.7) * 18;
+          const dir = Math.cos(a) > 0 ? 1 : -1, flap = Math.sin(time * 5 + n) > 0.4 ? -2 : 0;
+          const white = mixC([214, 218, 222], [255, 252, 244], T), dark = [40, 40, 44];
+          const B = (dx, dy, c) => h.blk(Math.round((x + dx * dir) / 2) * 2, Math.round((y + dy) / 2) * 2, 2, rgba(c));
+          for (let i = -10; i <= 10; i += 2) B(i * 0.3, 0, white);                              // body
+          for (let i = 2; i <= 12; i += 2) B(-2 + i * 0.4, -i * 0.5 + flap * (i / 12), white), B(-2 + i * 0.4, i * 0.1 - flap * (i / 12) * 0.5, white);
+          B(4, -8 + flap, dark); B(5, 0, dark);                                                 // black wing mark, eye
+          B(6, 0, [240, 120, 60]);                                                              // orange bill
+          for (let i = 2; i <= 20; i += 2) B(-4 - i, Math.sin(time * 3 + i * 0.3) * 0.6, white);   // tail streamers
+        }
+
+        // 3. Cloud banks drifting slowly through the canyon; they cover the far wall at the start and are gone
+        //    by the end (the falls come out about halfway).
+        //    (Cover is summed per 2x2 block first and blended once, so overlapping banks don't cut each other.)
+        const cover = Math.max(0, 1 - T * 1.15), acc = this._acc || (this._acc = new Float32Array(512 * 288));
+        if (cover > 0) acc.fill(0);
+        if (cover > 0) for (let n = 0; n < 24; n++) {
+          const w = 90 + hash2(n, 9) * 120, ch = 10 + hash2(n, 3) * 14;
+          const cy = 22 + hash2(n, 4) * 95, speed = 1.5 + hash2(n, 7) * 2.5;
+          const cx = (hash2(n, 5) * 520 + time * speed) % 520 - 100;
+          const a = cover * (0.55 + 0.35 * hash2(n, 6)) * Math.min(1, 0.5 + cover);
+          const x0 = Math.floor((cx - w / 2) * K), x1 = Math.ceil((cx + w / 2) * K), y0 = Math.floor((cy - ch) * K), y1 = Math.ceil((cy + ch) * K);
+          for (let y = Math.max(0, y0) & ~1; y < Math.min(576, y1); y += 2) for (let x = Math.max(0, x0) & ~1; x < Math.min(W, x1); x += 2) {
+            const dx = (x / K - cx) / (w / 2), dy = (y / K - cy) / ch, d = dx * dx + dy * dy;
+            if (d < 1) { const i = (y >> 1) * 512 + (x >> 1), v = a * (1 - d) * (0.8 + 0.2 * hash2(x >> 3, (y >> 3) + n)); acc[i] = 1 - (1 - acc[i]) * (1 - v); }
+          }
+        }
+        if (cover > 0) for (let i = 0; i < acc.length; i++) if (acc[i] > 0.01) blk((i % 512) * 2, ((i / 512) | 0) * 2, [226, 230, 234], acc[i]);
+      },
+    },
+  },
 };

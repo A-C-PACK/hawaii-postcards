@@ -60,8 +60,9 @@ const Scene = {
     this.base = new Uint8ClampedArray(SW * SH * 4);
     this.base32 = new Uint32Array(this.base.buffer);
     this.baseT = -1;
-    // Classify pixels once, from the sunrise plate: open water gets wave lines, glints/foam twinkle.
-    const S = data[data.length - 1], water = [], glint = [];
+    // Classify pixels once, from the sunrise plate (or scene.classify, e.g. Kaʻena's dark end state
+    // classifies from its first plate): open water gets wave lines, glints/foam twinkle.
+    const S = data[P.classify ?? data.length - 1], water = [], glint = [];
     for (let i = this.HZ * SW; i < SW * SH; i++) {
       const r = S[i * 4], gg = S[i * 4 + 1], b = S[i * 4 + 2];
       if (P.isGlint(r, gg, b)) glint.push(i); else if (P.isWater(r, gg, b)) water.push(i);
@@ -234,7 +235,7 @@ const Scene = {
         ky0 = Math.round(path[j][1] + (path[j + 1][1] - path[j][1]) * step);
       }
       const onSand = path && a > 0.25, ky = ky0 - (onSand ? 1 : Math.round(up * 2));
-      const shell = mixC([30, 55, 45], [70, 100, 60], T), head = mixC([45, 60, 50], [130, 140, 90], T);
+      const kT = L.kevinT ? L.kevinT(T) : T, shell = mixC([30, 55, 45], [70, 100, 60], kT), head = mixC([45, 60, 50], [130, 140, 90], kT);
       if (up > 0.3 && L.honu && onSand) L.honu(kx, ky, 1, time, T, { px, put, blk });   // the place's own resting-honu sprite
       else if (up > 0.3) {
         if (onSand) for (let n = -5; n <= 5; n++) put(kx + n, ky + 1, mixC([150, 120, 90], [196, 160, 112], T));   // shadow
@@ -268,16 +269,18 @@ const Scene = {
     }
     // The mynah: flies in, hops next to Tavita, flies off with a granola bar.
     if (this.mynah) {
-      const t = this.mynah.t, perch = [L.tavita + 17, L.ledge - 5];   // lands just right of Tavita
+      // (A place can bring its own thief: scene.thief = { rows, col, wingRow }, e.g. the Kauaʻi rooster.)
+      const TH = L.thief || { rows: MYNAH, col: MYNAH_COL, wingRow: 2 }, rows = TH.rows;
+      const t = this.mynah.t, perch = [L.tavita + 17, L.ledge - Math.round(rows.length * 3 / K)];   // lands just right of Tavita
       let x, y, hasBar = t > 2.4, flap = true;
       if (t < 1.6) { const f = t / 1.6; x = 330 + (perch[0] - 330) * f; y = perch[1] - Math.sin(f * Math.PI) * 30 - (1 - f) * 20; }
       else if (t < 3) { x = perch[0] - (t > 2 && t < 2.4 ? 3 : 0); y = perch[1] - (Math.floor(t * 4) % 2 ? 1 : 0); flap = false; }
       else { const f = (t - 3) / 2; x = perch[0] + f * 200; y = perch[1] - f * 60; }
-      const c = MYNAH_COL, s = 3, mx = x * K, my = y * K, wing = flap && Math.floor(time * 10) % 2;
-      MYNAH.forEach((row, j) => [...row].forEach((ch, i) => {
-        if (ch !== "." && !(wing && j === 2 && i > 0)) blk(mx + i * s, my + j * s, s, rgba(c[ch]));
+      const c = TH.col, s = 3, mx = x * K, my = y * K, wing = flap && Math.floor(time * 10) % 2, wr = TH.wingRow;
+      rows.forEach((row, j) => [...row].forEach((ch, i) => {
+        if (ch !== "." && !(wing && j === wr && i > 0)) blk(mx + i * s, my + j * s, s, rgba(c[ch]));
       }));
-      if (wing) blk(mx + s, my - s, s * 2, rgba(c.b));
+      if (wing) blk(mx + s, my + (wr - 3) * s, s * 2, rgba(c[rows[wr].replace(/\./g, "")[1]]));
       if (hasBar) { blk(mx - 2 * s, my + s, s, rgba([244, 162, 97])); blk(mx - 3 * s, my + s, s, rgba([244, 162, 97])); }
     }
     // Spray: small, so it sits with the painted foam.
