@@ -1062,4 +1062,195 @@ const PLACES = {
       },
     },
   },
+
+  12: {
+    id: "haleakala",
+    name: "Haleakalā",
+    when: "before sunrise",
+    clock: "5:30 a.m.",
+    music: "music/ocean_breeze.mp3",
+    plates: ["night", "dawn", "sunrise"].map(n => `plates/haleakala_${n}.png`),
+    nosun: "plates/haleakala_nosun.png",
+    granola: 26,
+    kevinAfter: "hidden",                   // no sea at the summit: Kevin phones from Oʻahu
+    thief: { img: "portrait_chukar", emoji: "🐦", call: "CHUK-CHUK!" },   // at the summit the snack thief is a chukar
+    act: {
+      sign: ["🪧", "Summit sign"], card: ["✉️", "Postcard"], pool: ["🌿", "Silverswords"],
+      kevin: ["🐢", "Kevin"], shells: ["☁️", "Clouds"], sun: ["🌄", "Sunrise"],
+    },
+    signLabel: "summit-sign",
+    shellsTitle: "Words in the sea of clouds",
+    reflectTitle: "Summit reflection",
+    reflectIcon: "🌄",
+    photoAlt: "Sunrise above a sea of clouds from the summit of Haleakalā on Maui, with silverswords on red-brown cinder",
+    scene: {
+      horizon: 18,                          // the flat tops of the sea of clouds
+      isWater: () => false,                 // (the clouds roll in the draw hook)
+      isGlint: () => false,
+      shimmer: [0, 0, 1],
+      glintWithSun: true,
+      sunFade: [0.92, 1],                   // the code sun comes up out of the clouds, then dissolves into the painted one
+      risingSun: { x: 163, y: 14, rx: 5, ry: 4, from: 9 },   // (starts just below the cloud tops)
+      stars: true,
+      starMask: (x, y) => !(x < 36 && y > 8),   // not over the distant peak, top left
+      sparkle: [163, 17],
+      spray: [],
+      whale: null,
+      kevin: null,
+      ledge: 168,                           // the sprites stand on the cinder, bottom left
+      player: 4, tavita: 18,
+      shade: [[64, 68, 106], [190, 150, 170], [255, 238, 222]],   // night → dawn → sunrise
+      birds: [[20, 22, 40], [56, 46, 66], [60, 54, 70]],
+      // The chukar: side view facing left (red beak, white face with a black necklace, grey body, barred flank).
+      thief: {
+        rows: ["...gg....", ".rwwkg...", "..kkgggg.", "..wgbgbgg", "...gbgbg.", "....r.r.."],
+        col: { g: [150, 145, 140], w: [236, 226, 206], k: [26, 26, 26], r: [214, 58, 42], b: [160, 82, 45] },
+        wingRow: 2,
+      },
+      // Signature animation: the sea of clouds rolls slowly (soft swells of light drifting across it, faster
+      // closer in), and once it is light, two nēnē walk and graze on the cinder beyond the silverswords.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024;
+        // 1. Cloud mask, once: bright, fairly grey pixels of the sunrise plate above the land's outline.
+        if (!this._cm) {
+          const P = S.plates[S.plates.length - 1], cm = this._cm = new Uint8Array(512 * 160);
+          const edge = x => x < 180 ? 238 : x < 560 ? 250 : x < 930 ? 262 - (x - 560) * 0.42 : 106 + (x - 930) * 0.4;
+          for (let by = 30; by < 160; by++) for (let bx = 0; bx < 512; bx++) {
+            const x = bx * 2, y = by * 2, o = (y * W + x) * 4, r = P[o], g = P[o + 1], b = P[o + 2];
+            if (y < 60 || y > edge(x) - 4) continue;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            if ((r + g + b) / 3 > 140 && mx - mn < 90 && b >= r - 30) cm[by * 512 + bx] = 1;
+          }
+        }
+        const cm = this._cm, amp = 0.05 + 0.05 * T;
+        for (let by = 30; by < 160; by++) {
+          const y = by * 2, d = (y - 58) / 200, sp = time * (2 + d * 10);
+          for (let bx = 0; bx < 512; bx++) {
+            if (!cm[by * 512 + bx]) continue;
+            const x = bx * 2;
+            const v = Math.sin((x + sp * 6) * (0.018 - d * 0.008) + Math.sin(y * 0.09 + time * 0.15) * 1.6) * 0.6
+                    + Math.sin((x - sp * 3) * 0.041 + y * 0.13) * 0.4;
+            const f = v * amp;
+            for (let yy = y; yy < y + 2; yy++) for (let xx = x; xx < x + 2; xx++) {
+              const o = (yy * W + xx) * 4;
+              h.px(xx, yy, f > 0 ? [base[o] + (255 - base[o]) * f, base[o + 1] + (255 - base[o + 1]) * f, base[o + 2] + (255 - base[o + 2]) * f]
+                                 : [base[o] * (1 + f), base[o + 1] * (1 + f), base[o + 2] * (1 + f * 0.6)]);
+            }
+          }
+        }
+        // 2. Two nēnē, from about halfway: they walk slowly along the cinder, stopping now and then to graze.
+        if (T > 0.45) for (let n = 0; n < 2; n++) {
+          const ph = time * 0.035 + n * 0.37, k = (ph % 1), dir = Math.floor(ph) % 2 ? -1 : 1;
+          const along = dir > 0 ? k : 1 - k, x = 400 + along * 150 + n * 26, y = 246 + n * 6;
+          const graze = Math.sin(time * 0.7 + n * 2) > 0.3;
+          this.nene(x, y, dir, graze, time + n, T, h);
+        }
+      },
+      // A nēnē in 2-pixel blocks, side view: black head and face, cream cheek, striped buff neck, grey-brown
+      // barred body, black legs. `graze` puts the head down.
+      nene(x, y, dir, graze, time, T, h) {
+        const light = mixC([0.75, 0.7, 0.85], [1, 1, 1], clamp((T - 0.45) * 2, 0, 1));
+        const C = c => rgba([c[0] * light[0], c[1] * light[1], c[2] * light[2]]);
+        const B = (dx, dy, c) => h.blk(Math.round((x + dx * 2 * dir) / 2) * 2, Math.round((y + dy * 2) / 2) * 2, 2, C(c));
+        const blk = [24, 22, 22], cream = [222, 206, 170], buff = [176, 150, 112], body = [120, 104, 88], bar = [86, 74, 64];
+        const step = Math.floor(time * 3) % 2;
+        for (let i = -4; i <= 3; i++) for (let j = -2; j <= 0; j++) B(i, j, (i + j) % 2 ? body : bar);   // body
+        B(-5, -1, blk); B(-5, 0, blk);                                                                  // tail
+        B(-1 - step, 1, blk); B(-1 - step, 2, blk); B(1 + step, 1, blk); B(1 + step, 2, blk);          // legs
+        if (graze) { B(4, -1, buff); B(5, 0, buff); B(6, 1, blk); B(7, 1, blk); B(6, 0, cream); }      // head down
+        else {
+          B(3, -3, buff); B(4, -4, cream); B(4, -5, buff); B(4, -6, cream);                             // neck stripes
+          B(4, -7, blk); B(5, -7, blk); B(5, -6, cream); B(6, -7, blk);                                  // head, cheek, bill
+        }
+      },
+    },
+  },
+
+  13: {
+    id: "waianapanapa",
+    name: "Waiʻānapanapa",
+    when: "a morning shower",
+    clock: "8:30 a.m.",
+    music: "music/sunset_breeze.mp3",
+    plates: ["rain", "clearing", "morning"].map(n => `plates/waianapanapa_${n}.png`),
+    nosun: "plates/waianapanapa_morning.png",   // (no painted sun: the light is the grade itself)
+    granola: 28,
+    kevinAfter: "random",                   // Kevin swam over from Oʻahu; he pops up in the cove now and then
+    act: {
+      sign: ["🪧", "Park sign"], card: ["✉️", "Postcard"], pool: ["🪨", "Lava rocks"],
+      kevin: ["🐢", "Kevin"], shells: ["✨", "Black sand"], sun: ["🌊", "Sea arch"],
+    },
+    signLabel: "park-sign",
+    shellsTitle: "Words in the black sand",
+    reflectTitle: "Sea arch reflection",
+    reflectIcon: "🌊",
+    photoAlt: "The black sand beach at Waiʻānapanapa on Maui in bright morning sun, with a lava sea arch, blue sea and green cliffs",
+    scene: {
+      horizon: 26,
+      isWater: (r, g, b) => b > r + 45 && g > r + 15,
+      isGlint: (r, g, b) => (r + g + b) / 3 > 205 && b >= r - 4,     // the white foam
+      shimmer: [0.03, 0.06, 0.9],
+      glintWithSun: false,
+      sunFade: [-1, -0.5],                  // (three plates in a row; the last is the render itself)
+      risingSun: null,
+      stars: false,
+      sparkle: [225, 60],                   // at the arch
+      spray: [[187, 58], [225, 62], [269, 67], [72, 67]],   // the arch's feet and the left cliff
+      whale: null,
+      kevin: [125, 60],                     // the open water of the cove, above the panels
+      ledge: 168,                           // the sprites sit on the black sand, bottom left
+      player: 4, tavita: 18,
+      shade: [[168, 174, 188], [226, 230, 236], [255, 250, 240]],   // grey shower → clearing → bright morning
+      birds: [[44, 46, 54], [40, 40, 48], [34, 34, 40]],            // black noddies
+      // Signature animation: rain streaks at the start (gone about a third of the way in), the surf surging
+      // through the two openings of the sea arch every few seconds, and the black sand glittering in the sun.
+      draw(S, T, time, h) {
+        const base = S.base, W = 1024;
+        const mix = (x, y, c, a) => {       // blend screen pixel (x, y) of the plate toward colour c
+          x |= 0; y |= 0; if (x < 0 || x >= W || y < 0 || y >= 576 || a <= 0) return;
+          const o = (y * W + x) * 4, f = Math.min(1, a);
+          h.px(x, y, [base[o] + (c[0] - base[o]) * f, base[o + 1] + (c[1] - base[o + 1]) * f, base[o + 2] + (c[2] - base[o + 2]) * f]);
+        };
+
+        // 1. The surge: every ~5 s a wave pushes white water through each arch opening, then drains back.
+        const ARCHES = [[705, 194, 30, 44, 0], [834, 214, 27, 38, 1.7]];   // centre x, y (waterline), half-width, height, phase
+        for (const [cx, cy, hw, ht, ph] of ARCHES) {
+          const t = ((time + ph) % 5.2) / 5.2, surge = t < 0.25 ? t / 0.25 : Math.max(0, 1 - (t - 0.25) / 0.5);
+          if (surge <= 0) continue;
+          for (let y = cy - ht; y < cy + 6; y += 2) for (let x = cx - hw; x < cx + hw; x += 2) {
+            const dx = (x - cx) / hw, dy = (cy - y) / ht;
+            const edge = 1 - dx * dx - Math.max(0, dy) * 1.2;
+            const n = hash2(x >> 1, (y >> 1) + Math.floor(time * 6));
+            const o = (y * W + x) * 4;
+            if (base[o] + base[o + 1] + base[o + 2] < 3 * 70) continue;          // only in the openings, not on the rock
+            const a = surge * clamp(edge * 1.6, 0, 1) * (0.55 + 0.45 * n) * (dy > surge ? 0 : 1);
+            if (a > 0.05) for (let k = 0; k < 4; k++) mix(x + (k & 1), y + (k >> 1), [246, 250, 252], a);
+          }
+          // a puff of spray thrown up at the peak of the surge
+          if (t > 0.18 && t < 0.4) for (let n = 0; n < 26; n++) {
+            const f = (t - 0.18) / 0.22, sx = cx + (hash2(n, 3) - 0.5) * hw * 2.4, sy = cy - ht * 0.6 - hash2(n, 4) * 34 * Math.sin(f * Math.PI);
+            mix(sx, sy, [250, 252, 255], 0.8 * (1 - f)); mix(sx + 1, sy, [250, 252, 255], 0.7 * (1 - f));
+          }
+        }
+
+        // 2. Rain: thin slanted streaks, thick at the start and gone by about a third of the way in.
+        const rain = clamp(1 - T / 0.35, 0, 1);
+        if (rain > 0) for (let n = 0; n < Math.round(260 * rain); n++) {
+          const sp = 380 + hash2(n, 2) * 160, x0 = hash2(n, 1) * 1100, y0 = ((hash2(n, 3) * 700 + time * sp) % 700) - 60;
+          const len = 10 + hash2(n, 4) * 10, a = 0.22 + 0.25 * hash2(n, 5);
+          for (let i = 0; i < len; i++) mix(x0 - (y0 + i) * 0.18, y0 + i, [214, 220, 230], a * rain);
+        }
+
+        // 3. Once the sun is out, single grains of the black sand flash and fade.
+        const glit = clamp((T - 0.55) / 0.35, 0, 1);
+        if (glit > 0) for (let n = 0; n < 140; n++) {
+          const x = Math.floor(hash2(n, 21) * 1024), y = 360 + Math.floor(hash2(n, 22) * 210);
+          const o = (y * W + x) * 4;
+          if (base[o] + base[o + 1] + base[o + 2] > 3 * 90) continue;             // only on the dark sand
+          const f = Math.sin(time * (1.4 + hash2(n, 23)) + n * 1.7);
+          if (f > 0.75) mix(x, y, [235, 240, 255], glit * (f - 0.75) * 4);
+        }
+      },
+    },
+  },
 };
